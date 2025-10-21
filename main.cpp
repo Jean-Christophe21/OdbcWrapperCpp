@@ -1,4 +1,6 @@
 #include <iostream>
+#include "necessary_function.h"
+
 
 int main()
 {
