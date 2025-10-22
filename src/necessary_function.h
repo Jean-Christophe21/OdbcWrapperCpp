@@ -11,7 +11,7 @@
 
 
 
-static std::string to_utf8_from_w(const SQLWCHAR* wstr, int len = -1) {
+inline std::string to_utf8_from_w(const SQLWCHAR* wstr, int len = -1) {
     if (!wstr) return {};
     int needed = WideCharToMultiByte(CP_UTF8, 0, reinterpret_cast<const wchar_t*>(wstr), len, nullptr, 0, nullptr, nullptr);   // retourne le nombre d'octet écris dans la mémoire tampon qu'on utilisera plus tard pour créer un string sur mésure
     if (needed <= 0) return {};
@@ -26,7 +26,7 @@ static std::string to_utf8_from_w(const SQLWCHAR* wstr, int len = -1) {
 }
 
 // utilitaire de conversion UTF-8 -> UTF-16 (std::string -> std::wstring)
-static std::wstring to_wstring_utf8(const std::string& s) {
+inline std::wstring to_wstring_utf8(const std::string& s) {
     if (s.empty()) return {};
     int len = MultiByteToWideChar(CP_UTF8, 0, s.c_str(), -1, nullptr, 0);
     if (len <= 0) return {};
@@ -36,7 +36,7 @@ static std::wstring to_wstring_utf8(const std::string& s) {
     return w;
 }
 
-static std::string CollectDiagnostics(SQLSMALLINT handleType, SQLHANDLE handle)
+inline std::string CollectDiagnostics(SQLSMALLINT handleType, SQLHANDLE handle)
 {
     std::string out;
     SQLSMALLINT recNumber = 1;
@@ -80,7 +80,7 @@ static std::string CollectDiagnostics(SQLSMALLINT handleType, SQLHANDLE handle)
 }
 
 
-static void logDetailedDiagnostics(SQLSMALLINT handleType, SQLHANDLE handle) {
+inline void logDetailedDiagnostics(SQLSMALLINT handleType, SQLHANDLE handle) {
     SQLSMALLINT recNumber = 1;
     while (true) {
         SQLWCHAR sqlState[6] = {};
@@ -119,9 +119,22 @@ static void logDetailedDiagnostics(SQLSMALLINT handleType, SQLHANDLE handle) {
 
 // ajout des fonctions de conversion de std::chrono::system_clock vers DATE_STRUCT
 
-DATE_STRUCT FromSystemClockToDATE_STRUCT(std::chrono::year_month_day date)
+inline DATE_STRUCT fromYear_month_dayToDATE_STRUCT(std::chrono::year_month_day date)
 {
-    DATE_STRUCT sql_date;
-    sql_date.day = unsigned(date.day());
+    DATE_STRUCT date_in_sql = {};
+    date_in_sql.day = unsigned(date.day());
+    date_in_sql.month = unsigned(date.month());
+    date_in_sql.year = int(date.year());
 
+    return date_in_sql;
+}
+
+inline std::chrono::year_month_day fromDATE_STRUCTtoYear_month_day(DATE_STRUCT date)
+{
+    std::chrono::day day = static_cast<std::chrono::day>(date.day);
+    std::chrono::month month = static_cast<std::chrono::month>(date.month);
+    std::chrono::year year = static_cast<std::chrono::year>(date.year);
+
+    std::chrono::year_month_day normal_date(year, month, day);
+    return normal_date;
 }

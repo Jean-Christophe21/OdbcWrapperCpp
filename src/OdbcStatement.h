@@ -192,37 +192,37 @@ public :
     }
 
     // ajout de bind date
-    void bindNullableDate(int pos, std::chrono::system_clock date)
-    {
-        int* valueptr = &value;
-        if (valueptr)
-        {
-            bindInt(pos, *valueptr);
-        }
-        else
-        {
-            indicators_.push_back(SQL_NO_DATA);
-            SQLLEN* ind = &indicators_.back();
+    //void bindNullableDate(int pos, std::chrono::system_clock date)
+    //{
+    //    int* valueptr = &value;
+    //    if (valueptr)
+    //    {
+    //        bindInt(pos, *valueptr);
+    //    }
+    //    else
+    //    {
+    //        indicators_.push_back(SQL_NO_DATA);
+    //        SQLLEN* ind = &indicators_.back();
 
-            auto ret = SQLBindParameter(
-                stmt_,
-                static_cast<SQLUSMALLINT>(pos),
-                SQL_PARAM_INPUT,
-                SQL_C_LONG,
-                SQL_INTEGER,
-                0,
-                0,
-                nullptr,
-                0,
-                ind);
+    //        auto ret = SQLBindParameter(
+    //            stmt_,
+    //            static_cast<SQLUSMALLINT>(pos),
+    //            SQL_PARAM_INPUT,
+    //            SQL_C_LONG,
+    //            SQL_INTEGER,
+    //            0,
+    //            0,
+    //            nullptr,
+    //            0,
+    //            ind);
 
-            if (!SUCCEEDED(ret))
-            {
-                throw OdbcError("Echec BindParameter failled to bind NUllable INt.\n(collectdiagnostic) = "
-                    + CollectDiagnostics(SQL_HANDLE_STMT, stmt_));
-            }
-        }
-    }
+    //        if (!SUCCEEDED(ret))
+    //        {
+    //            throw OdbcError("Echec BindParameter failled to bind NUllable INt.\n(collectdiagnostic) = "
+    //                + CollectDiagnostics(SQL_HANDLE_STMT, stmt_));
+    //        }
+    //    }
+    //}
 
 
     void execute() const

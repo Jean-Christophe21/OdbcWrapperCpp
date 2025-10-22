@@ -4,12 +4,49 @@
 
 int main()
 {
-    std::cout << "Bienvenue dans ce projet qui implémente l'API ODBC en C++.\n" <<
-        "Ce programme fournit des méthodes et fonctions pour accéder à manipuler des données d'une base de donnée.\n" <<
-        "Vous trouverez si dessous en commentaire quelques test éffectué sur les méthodes et fonctions afin de s'assurer de leur bon fonctionnement.\n";
+    // test de fromDATE_STRUCTtoYear_month_day
+    std::chrono::year_month_day today_date = {};
+    DATE_STRUCT date;
+    date.day = 22;
+    date.month = 10;
+    date.year = 2025;
+    today_date = fromDATE_STRUCTtoYear_month_day(date);
+    std::cout << "test de la fonction fromDATE_STRUCTtoYear_month_day : \n";
+
+    std::cout << today_date << "\n";
+    std::cout << today_date.day() << "/" << today_date.month() << "/" << today_date.year() << "\n" << std::endl;
+
+
+    // test de fromYear_month_dayToDATE_STRUCT
+    std::chrono::day day(22);
+    std::chrono::month month(10);
+    std::chrono::year year(2025);
+    std::chrono::year_month_day date_a_convertir(year, month, day);
+
+    auto date1 = fromYear_month_dayToDATE_STRUCT(date_a_convertir);
+    std::cout << "\ntest de la fonction fromYear_month_dayToDATE_STRUCT : \n";
+    std::cout << date1.day << "/" << date1.month << "/" << date1.year;
+
+    
     return 0;
 }
 
+
+
+
+
+//#include <iostream>
+//#include "necessary_function.h"
+//
+//
+//int main()
+//{
+//    std::cout << "Bienvenue dans ce projet qui implémente l'API ODBC en C++.\n" <<
+//        "Ce programme fournit des méthodes et fonctions pour accéder à manipuler des données d'une base de donnée.\n" <<
+//        "Vous trouverez si dessous en commentaire quelques test éffectué sur les méthodes et fonctions afin de s'assurer de leur bon fonctionnement.\n";
+//    return 0;
+//}
+//
 
 
 
