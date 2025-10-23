@@ -1,36 +1,96 @@
 #include <iostream>
+#include <cassert>
 #include "necessary_function.h"
+#include "OdbcConnection.h"
+#include "OdbcEnvironment.h"
+#include "OdbcError.h"
+#include "OdbcStatement.h"
+
+
 
 
 int main()
 {
-    // test de fromDATE_STRUCTtoYear_month_day
-    std::chrono::year_month_day today_date = {};
-    DATE_STRUCT date;
-    date.day = 22;
-    date.month = 10;
-    date.year = 2025;
-    today_date = fromDATE_STRUCTtoYear_month_day(date);
-    std::cout << "test de la fonction fromDATE_STRUCTtoYear_month_day : \n";
+    try 
+    {
+        std::cout << "création d'un environnement..\n";
+        OdbcEnvironment env;
+        assert(env.handle() != SQL_NULL_HENV);
+        std::cout << "> création d'un environnement avec succes\n\n";
+        
+        std::string connectionString = "Driver={ODBC Driver 17 for SQL Server};Server=(localdb)\\mylocaldb;Database=test3;Trusted_Connection=Yes;";
+        std::cout << "Test du second constructeur création d'une connection..\n";
+        OdbcConnection conn(env, connectionString, SQL_DRIVER_COMPLETE);   // test du second constructeur de la classe
+        assert(conn.handle() != SQL_NULL_HDBC);
+        std::cout << "> création d'une connexion avec succes\n\n";
+        
+        std::cout << "> création d'un handle de statement..\n\n";
+        OdbcStatement stmt(conn.handle());
+        assert(stmt.handle() != SQL_NULL_HSTMT);
+        
+        std::cout << "Handle de statement créé avec succes..\n\n";
+        
+        // test de directExecute
+        std::cout << "Execution de requetes simples...\n";
+        
+        // préparation de la requete 
 
-    std::cout << today_date << "\n";
-    std::cout << today_date.day() << "/" << today_date.month() << "/" << today_date.year() << "\n" << std::endl;
+        // Insertion de données
+        std::cout << "  > Insertion de donnees...\n";
+        stmt.Prepare("INSERT INTO Test_date (Date) VALUES (?)");
+        DATE_STRUCT date_sql_type(2038, 1, 19);
+        stmt.bindDate(1,date_sql_type);               
+        stmt.execute();
 
+        std::cout << "  > Donnees inserees avec succes.\n";
 
-    // test de fromYear_month_dayToDATE_STRUCT
-    std::chrono::day day(22);
-    std::chrono::month month(10);
-    std::chrono::year year(2025);
-    std::chrono::year_month_day date_a_convertir(year, month, day);
-
-    auto date1 = fromYear_month_dayToDATE_STRUCT(date_a_convertir);
-    std::cout << "\ntest de la fonction fromYear_month_dayToDATE_STRUCT : \n";
-    std::cout << date1.day << "/" << date1.month << "/" << date1.year;
+        std::cout << "\n> Toutes les requetes directes ont ete executees avec succes.\n";
+    }
+    catch (std::exception& e) {
+        std::cerr << "> Erreur lors de l'exécution de testOdbcStatement...\n\n";
+        std::cerr << "Erreur :" << e.what();
+        assert(false);
+    }
 
     
     return 0;
 }
 
+
+// test de fromDATE_STRUCTtoYear_month_day et de fromYear_month_dayToDATE_STRUCT
+//#include <iostream>
+//#include "necessary_function.h"
+//
+//
+//int main()
+//{
+//    // test de fromDATE_STRUCTtoYear_month_day
+//    std::chrono::year_month_day today_date = {};
+//    DATE_STRUCT date;
+//    date.day = 22;
+//    date.month = 10;
+//    date.year = 2025;
+//    today_date = fromDATE_STRUCTtoYear_month_day(date);
+//    std::cout << "test de la fonction fromDATE_STRUCTtoYear_month_day : \n";
+//
+//    std::cout << today_date << "\n";
+//    std::cout << today_date.day() << "/" << today_date.month() << "/" << today_date.year() << "\n" << std::endl;
+//
+//
+//    // test de fromYear_month_dayToDATE_STRUCT
+//    std::chrono::day day(22);
+//    std::chrono::month month(10);
+//    std::chrono::year year(2025);
+//    std::chrono::year_month_day date_a_convertir(year, month, day);
+//
+//    auto date1 = fromYear_month_dayToDATE_STRUCT(date_a_convertir);
+//    std::cout << "\ntest de la fonction fromYear_month_dayToDATE_STRUCT : \n";
+//    std::cout << date1.day << "/" << date1.month << "/" << date1.year;
+//
+//    
+//    return 0;
+//}
+//
 
 
 

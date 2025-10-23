@@ -1,8 +1,8 @@
 #pragma once
 
+#include <Windows.h>
 #include <sql.h>
 #include <sqlext.h>
-#include <Windows.h>
 #include <vector>
 #include <string.h>
 #include <string>
@@ -31,7 +31,7 @@ public :
         }
     }
 
-    SQLHSTMT handle(void)
+    SQLHSTMT handle(void) const
     {
         return stmt_;
     }
@@ -192,37 +192,34 @@ public :
     }
 
     // ajout de bind date
-    //void bindNullableDate(int pos, std::chrono::system_clock date)
-    //{
-    //    int* valueptr = &value;
-    //    if (valueptr)
-    //    {
-    //        bindInt(pos, *valueptr);
-    //    }
-    //    else
-    //    {
-    //        indicators_.push_back(SQL_NO_DATA);
-    //        SQLLEN* ind = &indicators_.back();
+    void bindDate(int pos, DATE_STRUCT date)
+    {
+        ownedDates_.push_back(date);
+        auto& ref = ownedDates_.back();
 
-    //        auto ret = SQLBindParameter(
-    //            stmt_,
-    //            static_cast<SQLUSMALLINT>(pos),
-    //            SQL_PARAM_INPUT,
-    //            SQL_C_LONG,
-    //            SQL_INTEGER,
-    //            0,
-    //            0,
-    //            nullptr,
-    //            0,
-    //            ind);
+        indicators_.push_back(static_cast<SQLLEN>(sizeof(date)));
+        SQLLEN ind = indicators_.back();
 
-    //        if (!SUCCEEDED(ret))
-    //        {
-    //            throw OdbcError("Echec BindParameter failled to bind NUllable INt.\n(collectdiagnostic) = "
-    //                + CollectDiagnostics(SQL_HANDLE_STMT, stmt_));
-    //        }
-    //    }
-    //}
+        SQLRETURN ret = SQLBindParameter(
+            stmt_,
+            static_cast<SQLLEN>(pos),
+            SQL_PARAM_INPUT,
+            SQL_C_DATE,
+            SQL_DATE,
+            0,
+            0,
+            (SQLPOINTER)&ref,
+            static_cast<SQLLEN>(SQL_DATE),
+            &ind
+        );
+
+        if (!SQL_SUCCEEDED(ret))
+        {
+            throw OdbcError("Error BindDate failled to bind date in the statement.\n(collectdiagnostic) = " + CollectDiagnostics(SQL_HANDLE_STMT, stmt_));
+        }
+    }
+
+
 
 
     void execute() const
@@ -304,6 +301,7 @@ public :
 private:
     SQLHSTMT stmt_ = nullptr;
     std::vector<std::string> ownedStrings_; // Stocke les chaînes pour garantir leur durée de vie pendant l'exécution de la requete
-    std::vector<int> ownedInts_;            // Stocke les entiers copiés pour garantir durée de vie
-    std::vector<SQLLEN> indicators_;        // Pour valeurs NULL éventuelles ou longueurs
+    std::vector<int> ownedInts_;            // Stocke les entiers pour garantir leur durée de vie
+    std::vector<SQLLEN> indicators_;        // Pour valeurs NULL éventuelles ou longueurs 
+    std::vector<DATE_STRUCT> ownedDates_;
 };
