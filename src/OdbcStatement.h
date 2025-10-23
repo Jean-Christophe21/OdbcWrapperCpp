@@ -319,6 +319,29 @@ public :
         return static_cast<int>(buf);
     }
 
+    //ajout de la méthode get Date
+    DATE_STRUCT getDate(int col) const
+    {
+        SQLLEN ind = 0;
+        DATE_STRUCT buf = {};
+        SQLLEN sizebuf = static_cast<SQLLEN>(sizeof(buf));
+
+        SQLRETURN ret = SQLGetData(stmt_, static_cast<SQLLEN>(col), SQL_DATE, (SQLPOINTER)&buf, sizebuf, &ind);
+
+        if (!SQL_SUCCEEDED(ret))
+        {
+            throw OdbcError("SQLGetData failled..\nErreur :" + CollectDiagnostics(SQL_HANDLE_STMT, stmt_));
+        }
+        if (ret == SQL_NULL_DATA)
+            return {};  // on retourne rien
+        else
+        {
+            return DATE_STRUCT(buf);
+        }
+        return DATE_STRUCT(buf);
+    }
+
+
     void closeCursor() const {
         SQLCloseCursor(stmt_);
     }
