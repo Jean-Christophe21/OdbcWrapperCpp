@@ -168,7 +168,7 @@ public :
         }
         else
         {
-            indicators_.push_back(SQL_NO_DATA);
+            indicators_.push_back(SQL_NULL_DATA);
             SQLLEN* ind = &indicators_.back();
 
             auto ret = SQLBindParameter(
@@ -219,7 +219,32 @@ public :
         }
     }
 
+    void bindNullableDate(int pos, DATE_STRUCT* date)
+    {
+        if (date)
+            bindDate(pos, *date);
+        else {
+            indicators_.push_back(SQL_NULL_DATA);
+            SQLLEN* ind = &indicators_.back();
 
+            auto ret = SQLBindParameter(
+                stmt_,
+                static_cast<SQLUSMALLINT>(pos),
+                SQL_PARAM_INPUT,
+                SQL_C_DATE,
+                SQL_DATE,
+                0,
+                0,
+                nullptr,
+                0,
+                ind);
+
+            if (!SQL_SUCCEEDED(ret))
+            {
+                throw OdbcError("Error BindDate failled to bind date in the statement.\n(collectdiagnostic) = " + CollectDiagnostics(SQL_HANDLE_STMT, stmt_));
+            }
+        }
+    }
 
 
     void execute() const

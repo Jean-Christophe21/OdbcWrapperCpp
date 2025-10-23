@@ -38,8 +38,8 @@ int main()
         // Insertion de données
         std::cout << "  > Insertion de donnees...\n";
         stmt.Prepare("INSERT INTO Test_date (Date) VALUES (?)");
-        DATE_STRUCT date_sql_type(2038, 1, 19);
-        stmt.bindDate(1,date_sql_type);               
+        DATE_STRUCT date_sql_type(2038, 1, 18);
+        stmt.bindNullableDate(1,nullptr /*&date_sql_type*/);        
         stmt.execute();
 
         std::cout << "  > Donnees inserees avec succes.\n";
