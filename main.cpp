@@ -7,8 +7,6 @@
 #include "OdbcStatement.h"
 
 
-
-
 int main()
 {
     try
