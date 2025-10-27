@@ -48,7 +48,7 @@ int main()
 
         stmt.closeCursor();
 
-        std::cout << "  > Donnees inserees avec succes.\n";
+        std::cout << "  > Donnees lues avec succes.\n";
 
         std::cout << "\n> Toutes les requetes directes ont ete executees avec succes.\n";
     }
