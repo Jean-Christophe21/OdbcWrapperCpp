@@ -128,7 +128,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="src\necessary_fucntion.cpp" />
     <ClCompile Include="src\necessary_function.h" />
+    <ClCompile Include="src\OdbcConnection.cpp" />
+    <ClCompile Include="src\OdbcEnvironment.cpp" />
+    <ClCompile Include="src\ODBCError.cpp" />
+    <ClCompile Include="src\ODBCStatement.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\OdbcConnection.h" />

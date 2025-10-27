@@ -43,7 +43,7 @@ int main()
             DATE_STRUCT date = stmt.getDate(2);
 
             // affichage des résulats
-            std::cout << "id : " << id << "  Date" << date.day << "/" << date.month << "/" << date.year << "\n";
+            std::cout << "id : " << id << "  Date : " << date.day << "/" << date.month << "/" << date.year << "\n";
         }
 
         stmt.closeCursor();
