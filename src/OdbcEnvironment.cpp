@@ -4,7 +4,7 @@
 #include "OdbcError.h"
 #include "OdbcEnvironment.h"
 
-OdbcEnvironment::OdbcEnvironment()
+OdbcEnvironment::OdbcEnvironment()    // constructeur
 {
 	if (SQLAllocHandle(SQL_HANDLE_ENV, SQL_NULL_HANDLE, &env_) != SQL_SUCCESS)
 	{
@@ -14,19 +14,20 @@ OdbcEnvironment::OdbcEnvironment()
 	if (!SQL_SUCCEEDED(SQLSetEnvAttr(env_,
 		SQL_ATTR_ODBC_VERSION,
 		(SQLPOINTER)SQL_OV_ODBC3,
-		0))) {
+		0))) 
+	{
 		std::string diag = CollectDiagnostics(SQL_HANDLE_ENV, env_);
 		SQLFreeHandle(SQL_HANDLE_ENV, env_);
 		throw OdbcError("Failed to set ODBC v3 attribute:\n" + diag);
 	}
 }
 
-OdbcEnvironment::~OdbcEnvironment(void)
+OdbcEnvironment::~OdbcEnvironment(void)   // destructeur
 {
 	SQLFreeHandle(SQL_HANDLE_ENV, env_);
 }
 
-SQLHENV OdbcEnvironment::handle(void) const
+SQLHENV OdbcEnvironment::handle(void) const   // retourne le handle de connexion
 {
 	return env_;			// déterminer plus tard si on va faire un return de référence ou d'utiliser un return d'une copie de SQLHENV comme fait
 }

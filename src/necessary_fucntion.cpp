@@ -5,6 +5,7 @@
 #include "necessary_function.h"
 
 
+// fonction pour convertir une chaine utf16 en utf16  (std::wstring -> std::string)
 std::string to_utf8_from_w(const SQLWCHAR* wstr, int len) {
     if (!wstr) return {};
     int needed = WideCharToMultiByte(CP_UTF8, 0, reinterpret_cast<const wchar_t*>(wstr), len, nullptr, 0, nullptr, nullptr);   // retourne le nombre d'octet écris dans la mémoire tampon qu'on utilisera plus tard pour créer un string sur mésure
@@ -30,6 +31,8 @@ std::wstring to_wstring_utf8(const std::string& s) {
     return w;
 }
 
+
+// fonction pour collecter les dignostics sur un type de Sur un type de handle donné Elle retourne un string contenant des erreurs  
 std::string CollectDiagnostics(SQLSMALLINT handleType, SQLHANDLE handle)
 {
     std::string out;
@@ -73,7 +76,7 @@ std::string CollectDiagnostics(SQLSMALLINT handleType, SQLHANDLE handle)
     return out;
 }
 
-
+// fonction pour collecter les dignostics sur un type de Sur un type de handle donné Elle affiche les erreurs dans le flux de sortie par défaut 
 void logDetailedDiagnostics(SQLSMALLINT handleType, SQLHANDLE handle) {
     SQLSMALLINT recNumber = 1;
     while (true) {
@@ -111,9 +114,8 @@ void logDetailedDiagnostics(SQLSMALLINT handleType, SQLHANDLE handle) {
 }
 
 
-// ajout des fonctions de conversion de std::chrono::system_clock vers DATE_STRUCT
-
-inline DATE_STRUCT fromYear_month_dayToDATE_STRUCT(std::chrono::year_month_day date)
+// ajout des fonctions de conversion de std::chrono::system_clock vers DATE_STRUCT et vice versa
+DATE_STRUCT fromYear_month_dayToDATE_STRUCT(std::chrono::year_month_day date)
 {
     DATE_STRUCT date_in_sql = {};
     date_in_sql.day = unsigned(date.day());
@@ -123,7 +125,7 @@ inline DATE_STRUCT fromYear_month_dayToDATE_STRUCT(std::chrono::year_month_day d
     return date_in_sql;
 }
 
-inline std::chrono::year_month_day fromDATE_STRUCTtoYear_month_day(DATE_STRUCT date)
+std::chrono::year_month_day fromDATE_STRUCTtoYear_month_day(DATE_STRUCT date)
 {
     std::chrono::day day = static_cast<std::chrono::day>(date.day);
     std::chrono::month month = static_cast<std::chrono::month>(date.month);

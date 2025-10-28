@@ -13,8 +13,8 @@ public:
 
 	SQLHENV handle(void) const;
 
-	//OdbcEnvironment(const OdbcEnvironment& env) = delete;
-	//OdbcEnvironment& operator=(const OdbcEnvironment& env) = delete;
+	OdbcEnvironment(const OdbcEnvironment& env) = delete;            // il faut éviter l'appel du constructeur de copie et l'utilisation de l'opérateur = 
+	OdbcEnvironment& operator=(const OdbcEnvironment& env) = delete;
 
 private:
 	SQLHENV env_ = nullptr;

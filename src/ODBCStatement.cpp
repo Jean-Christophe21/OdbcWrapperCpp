@@ -12,74 +12,105 @@
 
 
 OdbcStatement::OdbcStatement(SQLHDBC dbc)
+{
+    if (!SQL_SUCCEEDED(SQLAllocHandle(SQL_HANDLE_STMT, dbc, &stmt_)))
     {
-        if (!SQL_SUCCEEDED(SQLAllocHandle(SQL_HANDLE_STMT, dbc, &stmt_)))
-        {
-            throw OdbcError("SQLAllocHandle failled to alloc Handle");
-        }
+        throw OdbcError("SQLAllocHandle failled to alloc Handle");
     }
+}
 
 OdbcStatement::~OdbcStatement()
+{
+    if (stmt_)
     {
-        if (stmt_)
-        {
-            SQLFreeHandle(SQL_HANDLE_STMT, stmt_);
-        }
+        SQLFreeHandle(SQL_HANDLE_STMT, stmt_);
     }
+}
 
-    SQLHSTMT OdbcStatement::handle(void) const
+SQLHSTMT OdbcStatement::handle(void) const
+{
+    return stmt_;
+}
+
+
+// cette fonction permet d'exécuter directement des requetes sur la base de donnée
+void OdbcStatement::directExecute(const std::string& requete)
+{
+    std::wstring wrequete = to_wstring_utf8(requete);
+    SQLRETURN ret = SQLExecDirectW(stmt_, reinterpret_cast<SQLWCHAR*>(const_cast<wchar_t*>(wrequete.c_str())), SQL_NTS); //le cast échouait car on faisait const cast en char*
+
+    if (!SQL_SUCCEEDED(ret))
     {
-        return stmt_;
+        throw OdbcError("SQLExecDirectW failled to directely execute query.\n" + CollectDiagnostics(SQL_HANDLE_STMT,stmt_) );
     }
-
-    void OdbcStatement::directExecute(const std::string& requete)
-    {
-        std::wstring wrequete = to_wstring_utf8(requete);
-        SQLRETURN ret = SQLExecDirectW(stmt_, reinterpret_cast<SQLWCHAR*>(const_cast<wchar_t*>(wrequete.c_str())), SQL_NTS); 
-        // SQLExecDirectW échouait car on passait en deuxieme paramètre  reinterpret_cast<SQLWCHAR*>(const_cast<char*>(requete.c_str())).
-        // remplacer par  reinterpret_cast<SQLWCHAR*>(const_cast<wchar_t*>(wrequete.c_str())) sachant que std::wstring wrequete = to_wstring_utf8(requete); pour éviter l'erreur
-
-        if (!SQL_SUCCEEDED(ret))
-        {
-            throw OdbcError("SQLExecDirectW failled to directely execute query.\n" + CollectDiagnostics(SQL_HANDLE_STMT,stmt_) );
-        }
-    } 
+} 
     
+// ne pas oublier d'appeler execute() sinon la commande ne sera tout juste pas exécutée
+void OdbcStatement::Prepare(const std::string requete) 
+{
+    std::wstring wrequete = to_wstring_utf8(requete);
 
-    void OdbcStatement::Prepare(const std::string requete)   // ne pas éviter d'execute() sinon la commande ne sera tout jouste pas exécutée
+    auto ret = SQLPrepareW(stmt_, reinterpret_cast<SQLWCHAR*>(const_cast<wchar_t*>(wrequete.c_str())), SQL_NTS);
+
+    if (!SUCCEEDED(ret))
     {
-        std::wstring wrequete = to_wstring_utf8(requete);
-
-        auto ret = SQLPrepareW(stmt_, reinterpret_cast<SQLWCHAR*>(const_cast<wchar_t*>(wrequete.c_str())), SQL_NTS);
-
-        if (!SUCCEEDED(ret))
-        {
-            throw OdbcError("SQLAllocHandle failled to alloc Handle");
-        }
+        throw OdbcError("SQLAllocHandle failled to alloc Handle");
+    }
         
 
-        // permet d'éviter de garder des valeurs stockés au cas où le même objet est utilisé
-        ownedStrings_.clear();
-        ownedInts_.clear();
-        indicators_.clear();
+    // permet d'éviter de garder des valeurs stockés au cas où prepare échoue
+    ownedStrings_.clear();
+    ownedInts_.clear();
+    indicators_.clear();
 
-        size_t param_count = std::count(std::begin(requete), std::end(requete),  '?');
+    size_t param_count = std::count(std::begin(requete), std::end(requete),  '?');  // compter le nombre de  ? dans la requête
 
-        // reservation des espaces nécéssaires pour stocker les variables à bind dans notre requête
-        ownedStrings_.reserve(param_count);
-        ownedInts_.reserve(param_count);
-        indicators_.reserve(param_count);
-    }
+    // reservation des espaces nécéssaires pour stocker les variables à bind dans notre requête
+    ownedStrings_.reserve(param_count);
+    ownedInts_.reserve(param_count);
+    indicators_.reserve(param_count);
+}
 
-    void OdbcStatement::bindString(int pos, std::string value)
+// permet de bind un string non nul
+void OdbcStatement::bindString(int pos, std::string value)
+{
+    ownedStrings_.push_back(value);
+    auto& ref = ownedStrings_.back();
+    indicators_.push_back(static_cast<SQLLEN>(ref.size()));
+    SQLLEN* ind = &indicators_.back();
+
+    SQLULEN valueSize = static_cast<SQLULEN>(ref.size());
+    SQLULEN bufLen = static_cast<SQLULEN>(ref.size() + 1);
+
+    auto ret = SQLBindParameter(
+        stmt_,
+        static_cast<SQLUSMALLINT>(pos),
+        SQL_PARAM_INPUT,
+        SQL_C_CHAR,
+        SQL_VARCHAR,
+        valueSize,
+        0,
+        (SQLPOINTER)ref.c_str(),
+        bufLen,
+        ind);                   // lors du bind d'un string jusqu'ici tout fonctionne bien
+    if (!SQL_SUCCEEDED(ret))  // dans les prochaines versions veillez à mettre en place un cas pour SQL_SUCCESS_WITH_INFO 
     {
-        ownedStrings_.push_back(value);
-        auto& ref = ownedStrings_.back();
-        indicators_.push_back(static_cast<SQLLEN>(ref.size()));
-        SQLLEN* ind = &indicators_.back();
+        throw OdbcError("Echec BindParameter (collectdiagnostic) = " + CollectDiagnostics(SQL_HANDLE_STMT, stmt_));
+    }
+}
 
-        SQLULEN valueSize = static_cast<SQLULEN>(ref.size());
-        SQLULEN bufLen = static_cast<SQLULEN>(ref.size() + 1);
+// permet de bind un string qui peut être nul
+void OdbcStatement::bindNullableString(int pos, const std::string* valuePtr)
+{
+    if (valuePtr)
+    {
+        bindString(pos, std::string(*valuePtr));
+
+    }
+    else
+    {
+        indicators_.push_back(SQL_NULL_DATA);
+        SQLLEN* ind = &indicators_.back();
 
         auto ret = SQLBindParameter(
             stmt_,
@@ -87,257 +118,231 @@ OdbcStatement::~OdbcStatement()
             SQL_PARAM_INPUT,
             SQL_C_CHAR,
             SQL_VARCHAR,
-            valueSize,
             0,
-            (SQLPOINTER)ref.c_str(),
-            bufLen,
-            ind);                   // lors du bind d'un string jusqu'ici tout fonctionne bien
-        if (!SQL_SUCCEEDED(ret))  // dans les prochaines versions veillez à mettre en place un cas pour SQL_SUCCESS_WITH_INFO 
+            0,
+            nullptr,
+            0,
+            ind);
+        if (!SUCCEEDED(ret))
         {
-            throw OdbcError("Echec BindParameter (collectdiagnostic) = " + CollectDiagnostics(SQL_HANDLE_STMT, stmt_));
+            throw OdbcError("Echec BindParameter failled to bind Nullable string.\n(collectdiagnostic) = " + CollectDiagnostics(SQL_HANDLE_STMT, stmt_));
         }
     }
+}
 
-    void OdbcStatement::bindNullableString(int pos, const std::string* valuePtr)
+// permet de bind un int non nul
+void OdbcStatement::bindInt(int pos, const int value)
+{
+    ownedInts_.push_back(value);
+    auto& ref = ownedInts_.back();
+
+    indicators_.push_back(static_cast<SQLLEN>(sizeof(SQLINTEGER)));
+    SQLLEN& ind = indicators_.back();
+
+    auto ret = SQLBindParameter(
+        stmt_,
+        static_cast<SQLSMALLINT>(pos),
+        SQL_PARAM_INPUT,
+        SQL_C_LONG,
+        SQL_INTEGER,
+        0,
+        0,
+        (SQLPOINTER)&ref,
+        static_cast<SQLLEN>(sizeof(SQLINTEGER)),
+        &ind);
+            
+    if (!SUCCEEDED(ret))
     {
-        if (valuePtr)
-        {
-            bindString(pos, std::string(*valuePtr));
-
-       }
-        else
-        {
-            indicators_.push_back(SQL_NULL_DATA);
-            SQLLEN* ind = &indicators_.back();
-
-            auto ret = SQLBindParameter(
-                stmt_,
-                static_cast<SQLUSMALLINT>(pos),
-                SQL_PARAM_INPUT,
-                SQL_C_CHAR,
-                SQL_VARCHAR,
-                0,
-                0,
-                nullptr,
-                0,
-                ind);
-            if (!SUCCEEDED(ret))
-            {
-                throw OdbcError("Echec BindParameter failled to bind Nullable string.\n(collectdiagnostic) = " + CollectDiagnostics(SQL_HANDLE_STMT, stmt_));
-            }
-        }
+        throw OdbcError("Echec BindParameter failled to bind INt.\n(collectdiagnostic) = " + CollectDiagnostics(SQL_HANDLE_STMT, stmt_));
     }
+}
 
-
-    void OdbcStatement::bindInt(int pos, const int value)
+// permet de bind un int qui peut être nul
+void OdbcStatement::bindNullableInt(int pos, int value)
+{
+    int* valueptr = &value;
+    if (valueptr)
     {
-        ownedInts_.push_back(value);
-        auto& ref = ownedInts_.back();
-
-        indicators_.push_back(static_cast<SQLLEN>(sizeof(SQLINTEGER)));
-        SQLLEN& ind = indicators_.back();
+        bindInt(pos, *valueptr);
+    }
+    else
+    {
+        indicators_.push_back(SQL_NULL_DATA);
+        SQLLEN* ind = &indicators_.back();
 
         auto ret = SQLBindParameter(
             stmt_,
-            static_cast<SQLSMALLINT>(pos),
+            static_cast<SQLUSMALLINT>(pos),
             SQL_PARAM_INPUT,
             SQL_C_LONG,
             SQL_INTEGER,
             0,
             0,
-            (SQLPOINTER)&ref,
-            static_cast<SQLLEN>(sizeof(SQLINTEGER)),
-            &ind);
-            
+            nullptr,
+            0,
+            ind );
+
         if (!SUCCEEDED(ret))
         {
-            throw OdbcError("Echec BindParameter failled to bind INt.\n(collectdiagnostic) = " + CollectDiagnostics(SQL_HANDLE_STMT, stmt_));
+            throw OdbcError("Echec BindParameter failled to bind NUllable INt.\n(collectdiagnostic) = " 
+                + CollectDiagnostics(SQL_HANDLE_STMT, stmt_));
         }
     }
+}
 
-    void OdbcStatement::bindNullableInt(int pos, int value)
+// permet de bind une date non nul
+void OdbcStatement::bindDate(int pos, DATE_STRUCT date)
+{
+    ownedDates_.push_back(date);
+    auto& ref = ownedDates_.back();
+
+    indicators_.push_back(static_cast<SQLLEN>(sizeof(date)));
+    SQLLEN ind = indicators_.back();
+
+    SQLRETURN ret = SQLBindParameter(
+        stmt_,
+        static_cast<SQLLEN>(pos),
+        SQL_PARAM_INPUT,
+        SQL_C_DATE,
+        SQL_DATE,
+        0,
+        0,
+        (SQLPOINTER)&ref,
+        static_cast<SQLLEN>(SQL_DATE),
+        &ind
+    );
+
+    if (!SQL_SUCCEEDED(ret))
     {
-        int* valueptr = &value;
-        if (valueptr)
-        {
-            bindInt(pos, *valueptr);
-        }
-        else
-        {
-            indicators_.push_back(SQL_NULL_DATA);
-            SQLLEN* ind = &indicators_.back();
-
-            auto ret = SQLBindParameter(
-                stmt_,
-                static_cast<SQLUSMALLINT>(pos),
-                SQL_PARAM_INPUT,
-                SQL_C_LONG,
-                SQL_INTEGER,
-                0,
-                0,
-                nullptr,
-                0,
-                ind );
-
-            if (!SUCCEEDED(ret))
-            {
-                throw OdbcError("Echec BindParameter failled to bind NUllable INt.\n(collectdiagnostic) = " 
-                    + CollectDiagnostics(SQL_HANDLE_STMT, stmt_));
-            }
-        }
+        throw OdbcError("Error BindDate failled to bind date in the statement.\n(collectdiagnostic) = " + CollectDiagnostics(SQL_HANDLE_STMT, stmt_));
     }
+}
 
-    // ajout de bind date
-    void OdbcStatement::bindDate(int pos, DATE_STRUCT date)
-    {
-        ownedDates_.push_back(date);
-        auto& ref = ownedDates_.back();
+// permet de bind une date qui peut être nul
+void OdbcStatement::bindNullableDate(int pos, DATE_STRUCT* date)
+{
+    if (date)
+        bindDate(pos, *date);
+    else {
+        indicators_.push_back(SQL_NULL_DATA);
+        SQLLEN* ind = &indicators_.back();
 
-        indicators_.push_back(static_cast<SQLLEN>(sizeof(date)));
-        SQLLEN ind = indicators_.back();
-
-        SQLRETURN ret = SQLBindParameter(
+        auto ret = SQLBindParameter(
             stmt_,
-            static_cast<SQLLEN>(pos),
+            static_cast<SQLUSMALLINT>(pos),
             SQL_PARAM_INPUT,
             SQL_C_DATE,
             SQL_DATE,
             0,
             0,
-            (SQLPOINTER)&ref,
-            static_cast<SQLLEN>(SQL_DATE),
-            &ind
-        );
+            nullptr,
+            0,
+            ind);
 
         if (!SQL_SUCCEEDED(ret))
         {
             throw OdbcError("Error BindDate failled to bind date in the statement.\n(collectdiagnostic) = " + CollectDiagnostics(SQL_HANDLE_STMT, stmt_));
         }
     }
+}
 
-    void OdbcStatement::bindNullableDate(int pos, DATE_STRUCT* date)
+
+void OdbcStatement::execute() const
+{
+    auto ret = SQLExecute(stmt_);
+    if (!SUCCEEDED(ret))
     {
-        if (date)
-            bindDate(pos, *date);
-        else {
-            indicators_.push_back(SQL_NULL_DATA);
-            SQLLEN* ind = &indicators_.back();
-
-            auto ret = SQLBindParameter(
-                stmt_,
-                static_cast<SQLUSMALLINT>(pos),
-                SQL_PARAM_INPUT,
-                SQL_C_DATE,
-                SQL_DATE,
-                0,
-                0,
-                nullptr,
-                0,
-                ind);
-
-            if (!SQL_SUCCEEDED(ret))
-            {
-                throw OdbcError("Error BindDate failled to bind date in the statement.\n(collectdiagnostic) = " + CollectDiagnostics(SQL_HANDLE_STMT, stmt_));
-            }
-        }
+        throw OdbcError("Echec BindParameter failled to bind NUllable INt.\n(collectdiagnostic message) = "
+        + CollectDiagnostics(SQL_HANDLE_STMT, stmt_));
     }
+}
 
+// permet de vérifier s'il reste des données à afficher ou get 
+bool OdbcStatement::fetch() const {
+    auto ret = SQLFetch(stmt_);
+    if (ret == SQL_NO_DATA)
+        return false;
 
-    void OdbcStatement::execute() const
+    if (!SUCCEEDED(ret))
     {
-        auto ret = SQLExecute(stmt_);
-        if (!SUCCEEDED(ret))
-        {
-            throw OdbcError("Echec BindParameter failled to bind NUllable INt.\n(collectdiagnostic message) = "
-            + CollectDiagnostics(SQL_HANDLE_STMT, stmt_));
-        }
+        auto message = CollectDiagnostics(SQL_HANDLE_STMT, stmt_);
+        throw OdbcError("SQLFetch failled.\n(collectdiagnostic message) = "
+            + message);
     }
+    return true;
+}
 
-    bool OdbcStatement::fetch() const {
-        auto ret = SQLFetch(stmt_);
-        if (ret == SQL_NO_DATA)
-            return false;
+// permet de lire un string depuis la base de donnée
+std::string OdbcStatement::getString(int col) const
+{
+    SQLLEN ind = 0;
+    char buf[1024] = {};
+    SQLLEN taillebuf = static_cast<SQLLEN>(sizeof(buf));
 
-        if (!SUCCEEDED(ret))
-        {
-            auto message = CollectDiagnostics(SQL_HANDLE_STMT, stmt_);
-            throw OdbcError("SQLFetch failled.\n(collectdiagnostic message) = "
-                + message);
-        }
-        return true;
-    }
+    SQLRETURN ret = SQLGetData(stmt_, static_cast<SQLUSMALLINT>(col), SQL_C_CHAR, buf, static_cast<SQLLEN>(sizeof(buf)), &ind);
 
-
-    std::string OdbcStatement::getString(int col) const
+    if (!SQL_SUCCEEDED(ret) && ret != SQL_SUCCESS_WITH_INFO)
     {
-        SQLLEN ind = 0;
-        char buf[1024] = {};
-        SQLLEN taillebuf = static_cast<SQLLEN>(sizeof(buf));
-
-        SQLRETURN ret = SQLGetData(stmt_, static_cast<SQLUSMALLINT>(col), SQL_C_CHAR, buf, static_cast<SQLLEN>(sizeof(buf)), &ind);
-
-        if (!SQL_SUCCEEDED(ret) && ret != SQL_SUCCESS_WITH_INFO)
-        {
-            throw OdbcError("SQLGetData failled..\nErreur :" + CollectDiagnostics(SQL_HANDLE_STMT, stmt_));
-        }
+        throw OdbcError("SQLGetData failled..\nErreur :" + CollectDiagnostics(SQL_HANDLE_STMT, stmt_));
+    }
         
-        if (ret == SQL_NULL_DATA) {
-            return {};
-        }
-        if (ret > 0 && ind <= taillebuf)
-        {
-            return std::string(buf, static_cast<size_t>(sizeof(buf)));
-        }
+    if (ret == SQL_NULL_DATA) {
+        return {};
+    }
+    if (ret > 0 && ind <= taillebuf)
+    {
         return std::string(buf, static_cast<size_t>(sizeof(buf)));
     }
+    return std::string(buf, static_cast<size_t>(sizeof(buf)));
+}
 
+// permet de lire un int depuis la base de donnée
+int OdbcStatement::getInt(int col) const
+{
+    SQLLEN ind = 0;
+    SQLINTEGER buf = {};
+    SQLLEN sizebuf = static_cast<SQLLEN>(sizeof(buf));
 
-    int OdbcStatement::getInt(int col) const
+    SQLRETURN ret = SQLGetData(stmt_, static_cast<SQLUSMALLINT>(col), SQL_C_SLONG, &buf, static_cast<SQLLEN>(sizeof(buf)), &ind);
+
+    if (!SQL_SUCCEEDED(ret) && ret != SQL_SUCCESS_WITH_INFO)
     {
-        SQLLEN ind = 0;
-        SQLINTEGER buf = {};
-        SQLLEN sizebuf = static_cast<SQLLEN>(sizeof(buf));
+        throw OdbcError("SQLGetData failled..\nErreur :" + CollectDiagnostics(SQL_HANDLE_STMT, stmt_));
+    }
 
-        SQLRETURN ret = SQLGetData(stmt_, static_cast<SQLUSMALLINT>(col), SQL_C_SLONG, &buf, static_cast<SQLLEN>(sizeof(buf)), &ind);
-
-        if (!SQL_SUCCEEDED(ret) && ret != SQL_SUCCESS_WITH_INFO)
-        {
-            throw OdbcError("SQLGetData failled..\nErreur :" + CollectDiagnostics(SQL_HANDLE_STMT, stmt_));
-        }
-
-        if (ret == SQL_NULL_DATA) {
-            return {};
-        }
-        if (ret > 0)
-        {
-            return static_cast<int>(buf);
-        }
+    if (ret == SQL_NULL_DATA) {
+        return {};
+    }
+    if (ret > 0)
+    {
         return static_cast<int>(buf);
     }
+    return static_cast<int>(buf);
+}
 
-    //ajout de la méthode get Date
-    DATE_STRUCT OdbcStatement::getDate(int col) const
+// permet de lire une date depuis la base de donnée
+DATE_STRUCT OdbcStatement::getDate(int col) const
+{
+    SQLLEN ind = 0;
+    DATE_STRUCT buf = {};
+    SQLLEN sizebuf = static_cast<SQLLEN>(sizeof(buf));
+
+    SQLRETURN ret = SQLGetData(stmt_, static_cast<SQLLEN>(col), SQL_DATE, (SQLPOINTER)&buf, sizebuf, &ind);
+
+    if (!SQL_SUCCEEDED(ret))
     {
-        SQLLEN ind = 0;
-        DATE_STRUCT buf = {};
-        SQLLEN sizebuf = static_cast<SQLLEN>(sizeof(buf));
-
-        SQLRETURN ret = SQLGetData(stmt_, static_cast<SQLLEN>(col), SQL_DATE, (SQLPOINTER)&buf, sizebuf, &ind);
-
-        if (!SQL_SUCCEEDED(ret))
-        {
-            throw OdbcError("SQLGetData failled..\nErreur :" + CollectDiagnostics(SQL_HANDLE_STMT, stmt_));
-        }
-        if (ret == SQL_NULL_DATA)
-            return {};  // on retourne rien
-        else
-        {
-            return DATE_STRUCT(buf);
-        }
+        throw OdbcError("SQLGetData failled..\nErreur :" + CollectDiagnostics(SQL_HANDLE_STMT, stmt_));
+    }
+    if (ret == SQL_NULL_DATA)
+        return {};  // on retourne rien
+    else
+    {
         return DATE_STRUCT(buf);
     }
+    return DATE_STRUCT(buf);
+}
 
-
-    void OdbcStatement::closeCursor() const {
-        SQLCloseCursor(stmt_);
-    }
+// ferme le curseur
+void OdbcStatement::closeCursor() const {
+    SQLCloseCursor(stmt_);
+}
